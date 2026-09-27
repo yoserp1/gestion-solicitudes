@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: indicadores
+  config:
+    import:
+      - optional:file:../../.env[.properties]
+      - optional:file:${ENV_FILE:.env}[.properties]
+  profiles:
+    default: ${SPRING_PROFILES_ACTIVE:docs}
+
+server:
+  port: ${SERVER_PORT:8082}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+    path: /swagger-ui.html
+    url: /openapi/indicadores-api-v1.yaml
+    disable-swagger-default-url: true
+    display-operation-id: true
+    try-it-out-enabled: true

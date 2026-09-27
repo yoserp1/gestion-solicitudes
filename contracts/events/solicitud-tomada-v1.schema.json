@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/contracts/events/solicitud-tomada-v1.schema.json",
+  "title": "SolicitudTomada v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "occurredAt",
+    "aggregateId",
+    "type",
+    "version",
+    "correlationId",
+    "estado",
+    "categoriaId",
+    "categoriaCodigo",
+    "categoriaNombre",
+    "actorId"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "aggregateId": { "type": "string", "format": "uuid" },
+    "type": { "const": "SolicitudTomada" },
+    "version": { "type": "integer", "minimum": 1 },
+    "correlationId": { "type": "string", "format": "uuid" },
+    "estado": { "const": "EN_ATENCION" },
+    "categoriaId": { "type": "string", "format": "uuid" },
+    "categoriaCodigo": { "type": "string", "minLength": 1, "maxLength": 30 },
+    "categoriaNombre": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "actorId": { "type": "string", "minLength": 1, "maxLength": 100 }
+  }
+}

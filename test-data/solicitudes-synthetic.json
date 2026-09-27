@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "synthetic": true,
+    "seed": 42,
+    "count": 3,
+    "generated_at_schema_version": 1
+  },
+  "registros": [
+    {
+      "asunto": "Solicitud prueba 9564",
+      "descripcion": "Descripcion sintetica para solicitud 7127",
+      "prioridad": "ALTA",
+      "motivoAsignacion": "Inicio atencion 5358",
+      "observacion": "Observacion sintetica 3871",
+      "motivoResolucion": "Resolucion satisfactoria 7543",
+      "motivoCierre": "Cierre supervisor 1007"
+    },
+    {
+      "asunto": "Solicitud prueba 7306",
+      "descripcion": "Descripcion sintetica para solicitud 4510",
+      "prioridad": "ALTA",
+      "motivoAsignacion": "Inicio atencion 6039",
+      "observacion": "Observacion sintetica 5179",
+      "motivoResolucion": "Resolucion satisfactoria 1230",
+      "motivoCierre": "Cierre supervisor 9729"
+    },
+    {
+      "asunto": "Solicitud prueba 3743",
+      "descripcion": "Descripcion sintetica para solicitud 0017",
+      "prioridad": "BAJA",
+      "motivoAsignacion": "Inicio atencion 5735",
+      "observacion": "Observacion sintetica 3115",
+      "motivoResolucion": "Resolucion satisfactoria 3334",
+      "motivoCierre": "Cierre supervisor 7763"
+    }
+  ]
+}

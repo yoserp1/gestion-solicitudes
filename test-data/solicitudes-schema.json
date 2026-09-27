@@ -1,0 +1,57 @@
+{
+  "seed": 42,
+  "count": 3,
+  "locale": "es_CL",
+  "formato_salida": "json",
+  "campos": [
+    {
+      "nombre": "asunto",
+      "tipo": "texto_patron",
+      "patron": "Solicitud prueba ####",
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "nombre": "descripcion",
+      "tipo": "texto_patron",
+      "patron": "Descripcion sintetica para solicitud ####",
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "nombre": "prioridad",
+      "tipo": "categorico",
+      "valores": ["BAJA", "MEDIA", "ALTA"],
+      "nullable": false,
+      "unique": false
+    },
+    {
+      "nombre": "motivoAsignacion",
+      "tipo": "texto_patron",
+      "patron": "Inicio atencion ####",
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "nombre": "observacion",
+      "tipo": "texto_patron",
+      "patron": "Observacion sintetica ####",
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "nombre": "motivoResolucion",
+      "tipo": "texto_patron",
+      "patron": "Resolucion satisfactoria ####",
+      "nullable": false,
+      "unique": true
+    },
+    {
+      "nombre": "motivoCierre",
+      "tipo": "texto_patron",
+      "patron": "Cierre supervisor ####",
+      "nullable": false,
+      "unique": true
+    }
+  ]
+}

@@ -1,0 +1,570 @@
+openapi: 3.1.0
+info:
+  title: API de Solicitudes Operacionales
+  version: 1.0.0
+  description: |
+    API operacional para registrar, consultar, asignar y cambiar el estado de solicitudes.
+    Todas las operaciones modificadoras requieren autenticación, autorización, una clave de
+    idempotencia y, cuando modifican una solicitud existente, control de concurrencia con ETag.
+  contact:
+    name: Equipo de la prueba técnica
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: http://{host}:{port}
+    description: Entorno local
+    variables:
+      host:
+        default: localhost
+      port:
+        default: '8081'
+tags:
+  - name: Solicitudes
+    description: Registro y consulta operacional de solicitudes.
+  - name: Atencion
+    description: Asignación y transición de solicitudes.
+  - name: Observaciones
+    description: Registro de observaciones durante la atención.
+  - name: Catalogo
+    description: Consulta del catálogo persistente de categorías activas.
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/solicitudes:
+    post:
+      tags: [Solicitudes]
+      summary: Registrar una solicitud
+      description: |
+        Crea una solicitud en estado REGISTRADA, registra su primer historial y genera
+        SolicitudRegistrada mediante el patrón Outbox dentro de la misma transacción.
+      operationId: registrarSolicitud
+      x-required-roles: [SOLICITANTE]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarSolicitudRequest'
+      responses:
+        '201':
+          description: Solicitud registrada
+          headers:
+            Location:
+              description: URI del recurso creado
+              schema: { type: string, format: uri-reference }
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/IdempotencyConflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+        '500': { $ref: '#/components/responses/InternalError' }
+    get:
+      tags: [Solicitudes]
+      summary: Consultar la bandeja de solicitudes
+      description: |
+        SOLICITANTE obtiene únicamente sus solicitudes; ANALISTA y SUPERVISOR pueden consultar
+        todas las solicitudes conforme a sus permisos.
+      operationId: listarSolicitudes
+      x-required-roles: [SOLICITANTE, ANALISTA, SUPERVISOR]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: estado
+          in: query
+          schema: { $ref: '#/components/schemas/EstadoSolicitud' }
+        - name: categoriaId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: prioridad
+          in: query
+          schema: { $ref: '#/components/schemas/Prioridad' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: sort
+          in: query
+          description: Orden en formato campo,dirección.
+          schema:
+            type: string
+            default: creadaEn,desc
+            pattern: '^(creadaEn|actualizadaEn|prioridad),(asc|desc)$'
+      responses:
+        '200':
+          description: Página de solicitudes
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaSolicitudesResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/v1/solicitudes/{solicitudId}:
+    get:
+      tags: [Solicitudes]
+      summary: Consultar el detalle y la línea de tiempo
+      operationId: obtenerSolicitud
+      x-required-roles: [SOLICITANTE, ANALISTA, SUPERVISOR]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Detalle de la solicitud
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/v1/solicitudes/{solicitudId}/asignaciones:
+    post:
+      tags: [Atencion]
+      summary: Tomar una solicitud
+      description: |
+        Asigna al analista autenticado y cambia REGISTRADA a EN_ATENCION. If-Match impide
+        que dos analistas confirmen la misma versión de la solicitud.
+      operationId: tomarSolicitud
+      x-required-roles: [ANALISTA]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TomarSolicitudRequest'
+      responses:
+        '200':
+          description: Solicitud asignada al analista autenticado
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BusinessConflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/v1/solicitudes/{solicitudId}/observaciones:
+    post:
+      tags: [Observaciones]
+      summary: Agregar una observación
+      operationId: agregarObservacion
+      x-required-roles: [ANALISTA]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgregarObservacionRequest'
+      responses:
+        '201':
+          description: Observación agregada
+          headers:
+            Location:
+              schema: { type: string, format: uri-reference }
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Observacion'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BusinessConflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/v1/solicitudes/{solicitudId}/transiciones:
+    post:
+      tags: [Atencion]
+      summary: Cambiar el estado de una solicitud
+      description: |
+        ANALISTA puede resolver una solicitud EN_ATENCION. SUPERVISOR puede devolver una
+        solicitud RESUELTA a EN_ATENCION o cerrarla. Toda transición registra actor, fecha y motivo.
+      operationId: cambiarEstadoSolicitud
+      x-required-roles: [ANALISTA, SUPERVISOR]
+      parameters:
+        - $ref: '#/components/parameters/SolicitudId'
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambiarEstadoSolicitudRequest'
+      responses:
+        '200':
+          description: Estado actualizado e historial registrado
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudDetalleResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BusinessConflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/InvalidTransition' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/v1/categorias:
+    get:
+      tags: [Catalogo]
+      summary: Consultar categorías activas
+      operationId: listarCategoriasActivas
+      x-required-roles: [SOLICITANTE, ANALISTA, SUPERVISOR]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Categorías activas ordenadas por nombre
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Categoria' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token emitido por Keycloak mediante Authorization Code con PKCE.
+  parameters:
+    SolicitudId:
+      name: solicitudId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: Identificador de correlación; el servidor genera uno cuando no se informa.
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Identifica un comando para devolver el mismo resultado ante reintentos equivalentes.
+      schema: { type: string, format: uuid }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: ETag obtenido al consultar la solicitud; evita actualizaciones concurrentes perdidas.
+      schema:
+        type: string
+        pattern: '^"[0-9]+"$'
+        examples: ['"3"']
+  headers:
+    ETag:
+      description: Versión vigente del agregado.
+      schema:
+        type: string
+        examples: ['"4"']
+    CorrelationId:
+      description: Identificador de correlación propagado o generado por el servidor.
+      schema: { type: string, format: uuid }
+  responses:
+    BadRequest:
+      description: Solicitud mal formada o parámetros inválidos
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblem' }
+    Unauthorized:
+      description: Token ausente, inválido o expirado
+      headers:
+        WWW-Authenticate:
+          schema: { type: string }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: El usuario autenticado no tiene el rol o acceso al recurso
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Solicitud inexistente o no visible para el usuario
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    BusinessConflict:
+      description: Conflicto con el estado actual, asignación existente o clave de idempotencia reutilizada
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    IdempotencyConflict:
+      description: La clave de idempotencia ya fue utilizada con un cuerpo diferente
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionFailed:
+      description: El ETag no coincide; el recurso fue modificado por otra operación
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionRequired:
+      description: La operación requiere la cabecera If-Match
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    UnprocessableEntity:
+      description: Datos sintácticamente válidos que incumplen una regla de negocio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblem' }
+    InvalidTransition:
+      description: Transición de estado no permitida por el dominio
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InternalError:
+      description: Error interno sin exposición de detalles sensibles
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    EstadoSolicitud:
+      type: string
+      enum: [REGISTRADA, EN_ATENCION, RESUELTA, CERRADA]
+    Prioridad:
+      type: string
+      enum: [BAJA, MEDIA, ALTA]
+    Rol:
+      type: string
+      enum: [SOLICITANTE, ANALISTA, SUPERVISOR]
+    RegistrarSolicitudRequest:
+      type: object
+      additionalProperties: false
+      required: [asunto, descripcion, categoriaId, prioridad]
+      properties:
+        asunto:
+          type: string
+          minLength: 5
+          maxLength: 150
+          examples: [Coordinación de sala para reunión]
+        descripcion:
+          type: string
+          minLength: 10
+          maxLength: 2000
+          examples: [Se requiere coordinar una sala para una reunión interna de prueba.]
+        categoriaId:
+          type: string
+          format: uuid
+        prioridad:
+          $ref: '#/components/schemas/Prioridad'
+    TomarSolicitudRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 500
+          examples: [Inicio de atención]
+    AgregarObservacionRequest:
+      type: object
+      additionalProperties: false
+      required: [contenido]
+      properties:
+        contenido:
+          type: string
+          minLength: 3
+          maxLength: 2000
+          examples: [Se coordinó la disponibilidad solicitada.]
+    CambiarEstadoSolicitudRequest:
+      type: object
+      additionalProperties: false
+      required: [estadoDestino, motivo]
+      properties:
+        estadoDestino:
+          $ref: '#/components/schemas/EstadoSolicitud'
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 500
+          examples: [Solicitud atendida satisfactoriamente]
+    Categoria:
+      type: object
+      additionalProperties: false
+      required: [id, codigo, nombre, activa]
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string, pattern: '^[A-Z0-9_-]{2,30}$', examples: [COORDINACION] }
+        nombre: { type: string, maxLength: 100, examples: [Coordinación interna] }
+        activa:
+          type: boolean
+          description: Siempre es true porque este recurso sólo expone categorías activas.
+    Actor:
+      type: object
+      additionalProperties: false
+      required: [id, rol]
+      properties:
+        id:
+          type: string
+          maxLength: 100
+          description: Identificador técnico seudonimizado proveniente del claim sub.
+          examples: [usr-test-analista-01]
+        rol: { $ref: '#/components/schemas/Rol' }
+    Observacion:
+      type: object
+      additionalProperties: false
+      required: [id, contenido, actor, creadaEn]
+      properties:
+        id: { type: string, format: uuid }
+        contenido: { type: string, maxLength: 2000 }
+        actor: { $ref: '#/components/schemas/Actor' }
+        creadaEn: { type: string, format: date-time }
+    HistorialEstado:
+      type: object
+      additionalProperties: false
+      required: [id, estadoDestino, actor, motivo, ocurridoEn]
+      properties:
+        id: { type: string, format: uuid }
+        estadoOrigen:
+          oneOf:
+            - $ref: '#/components/schemas/EstadoSolicitud'
+            - type: 'null'
+        estadoDestino: { $ref: '#/components/schemas/EstadoSolicitud' }
+        actor: { $ref: '#/components/schemas/Actor' }
+        motivo: { type: string, maxLength: 500 }
+        ocurridoEn: { type: string, format: date-time }
+    SolicitudResumen:
+      type: object
+      additionalProperties: false
+      required: [id, codigo, asunto, categoria, prioridad, estado, creadaEn, actualizadaEn]
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string, pattern: '^SOL-[0-9]{4}-[0-9]{6}$', examples: [SOL-2026-000001] }
+        asunto: { type: string, maxLength: 150 }
+        categoria: { $ref: '#/components/schemas/Categoria' }
+        prioridad: { $ref: '#/components/schemas/Prioridad' }
+        estado: { $ref: '#/components/schemas/EstadoSolicitud' }
+        analistaAsignado:
+          oneOf:
+            - $ref: '#/components/schemas/Actor'
+            - type: 'null'
+        creadaEn: { type: string, format: date-time }
+        actualizadaEn: { type: string, format: date-time }
+        version: { type: integer, format: int64, minimum: 0 }
+    SolicitudDetalleResponse:
+      allOf:
+        - $ref: '#/components/schemas/SolicitudResumen'
+        - type: object
+          required: [descripcion, solicitante, observaciones, historial]
+          properties:
+            descripcion: { type: string, maxLength: 2000 }
+            solicitante: { $ref: '#/components/schemas/Actor' }
+            observaciones:
+              type: array
+              items: { $ref: '#/components/schemas/Observacion' }
+            historial:
+              type: array
+              items: { $ref: '#/components/schemas/HistorialEstado' }
+    PaginaSolicitudesResponse:
+      type: object
+      additionalProperties: false
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/SolicitudResumen' }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+        totalElements: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    Problem:
+      type: object
+      additionalProperties: true
+      required: [type, title, status, detail, instance, correlationId, code]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string, format: uri-reference }
+        correlationId: { type: string, format: uuid }
+        code:
+          type: string
+          examples: [SOLICITUD_TRANSICION_INVALIDA]
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                required: [field, message]
+                properties:
+                  field: { type: string }
+                  message: { type: string }

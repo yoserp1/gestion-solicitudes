@@ -1,0 +1,15 @@
+<mxfile host="app.diagrams.net" version="24.7.17">
+  <diagram name="Contexto">
+    <mxGraphModel dx="1200" dy="700" grid="1" gridSize="10" page="1" pageWidth="1169" pageHeight="827">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="usuarios" value="&lt;b&gt;Usuarios&lt;/b&gt;&lt;br&gt;Solicitante, analista y supervisor" style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;fillColor=#08427b;fontColor=#ffffff;strokeColor=#073B6F;" vertex="1" parent="1"><mxGeometry x="80" y="260" width="140" height="140" as="geometry"/></mxCell>
+        <mxCell id="sistema" value="&lt;b&gt;Gestión de solicitudes e indicadores&lt;/b&gt;&lt;br&gt;Sistema interno" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168BD;fontColor=#ffffff;strokeColor=#0b4884;arcSize=5;" vertex="1" parent="1"><mxGeometry x="400" y="270" width="260" height="110" as="geometry"/></mxCell>
+        <mxCell id="idp" value="&lt;b&gt;Proveedor de identidad&lt;/b&gt;&lt;br&gt;Sistema externo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#999999;fontColor=#ffffff;strokeColor=#8A8A8A;arcSize=5;" vertex="1" parent="1"><mxGeometry x="820" y="270" width="210" height="100" as="geometry"/></mxCell>
+        <mxCell id="r_usuarios_sistema" value="HTTP/JSON" style="rounded=1;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="usuarios" target="sistema"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="r_sistema_idp" value="OIDC/JWT" style="rounded=1;html=1;edgeStyle=orthogonalEdgeStyle;" edge="1" parent="1" source="sistema" target="idp"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

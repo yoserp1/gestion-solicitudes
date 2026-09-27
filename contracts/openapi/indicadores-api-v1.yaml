@@ -1,0 +1,276 @@
+openapi: 3.1.0
+info:
+  title: API de Indicadores de Solicitudes
+  version: 1.0.0
+  description: |
+    API de solo lectura alimentada asíncronamente por eventos de solicitudes. La proyección
+    aplica cada eventId una sola vez mediante un registro idempotente con unicidad persistente.
+    Las respuestas informan hasta qué instante se encuentra actualizada la vista analítica.
+  contact:
+    name: Equipo de la prueba técnica
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: http://{host}:{port}
+    description: Entorno local
+    variables:
+      host:
+        default: localhost
+      port:
+        default: '8082'
+tags:
+  - name: Indicadores
+    description: Consultas agregadas sobre la proyección analítica de solicitudes.
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/indicadores/resumen:
+    get:
+      tags: [Indicadores]
+      summary: Consultar el resumen de solicitudes
+      description: Devuelve conteos por estado y categoría para el período solicitado.
+      operationId: obtenerResumenIndicadores
+      x-required-roles: [ANALISTA, SUPERVISOR]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - $ref: '#/components/parameters/CategoriaId'
+      responses:
+        '200':
+          description: Resumen calculado desde la proyección analítica
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Data-As-Of:
+              $ref: '#/components/headers/DataAsOf'
+            Cache-Control:
+              schema: { type: string, examples: [private, max-age=30] }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumenIndicadoresResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/InvalidDateRange' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+  /api/v1/indicadores/tendencia:
+    get:
+      tags: [Indicadores]
+      summary: Consultar la tendencia diaria
+      description: |
+        Devuelve el número de solicitudes registradas, resueltas y cerradas por día. Los días
+        sin actividad se incluyen con valor cero para facilitar su representación gráfica.
+      operationId: obtenerTendenciaDiaria
+      x-required-roles: [ANALISTA, SUPERVISOR]
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/DesdeRequerido'
+        - $ref: '#/components/parameters/HastaRequerido'
+        - $ref: '#/components/parameters/CategoriaId'
+        - name: zonaHoraria
+          in: query
+          required: false
+          description: Zona IANA utilizada para agrupar eventos por día.
+          schema:
+            type: string
+            default: UTC
+            maxLength: 64
+            examples: [America/Santiago]
+      responses:
+        '200':
+          description: Serie temporal diaria
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+            X-Data-As-Of:
+              $ref: '#/components/headers/DataAsOf'
+            Cache-Control:
+              schema: { type: string, examples: [private, max-age=30] }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TendenciaDiariaResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/InvalidDateRange' }
+        '500': { $ref: '#/components/responses/InternalError' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token emitido por Keycloak mediante Authorization Code con PKCE.
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: Identificador de correlación; el servidor genera uno cuando no se informa.
+      schema: { type: string, format: uuid }
+    Desde:
+      name: desde
+      in: query
+      required: false
+      description: Fecha inicial inclusiva; por defecto, 30 días antes de hasta.
+      schema: { type: string, format: date }
+    Hasta:
+      name: hasta
+      in: query
+      required: false
+      description: Fecha final inclusiva; por defecto, la fecha actual.
+      schema: { type: string, format: date }
+    DesdeRequerido:
+      name: desde
+      in: query
+      required: true
+      description: Fecha inicial inclusiva.
+      schema: { type: string, format: date }
+    HastaRequerido:
+      name: hasta
+      in: query
+      required: true
+      description: Fecha final inclusiva; el rango máximo permitido es 366 días.
+      schema: { type: string, format: date }
+    CategoriaId:
+      name: categoriaId
+      in: query
+      required: false
+      description: Restringe el cálculo a una categoría.
+      schema: { type: string, format: uuid }
+  headers:
+    CorrelationId:
+      description: Identificador de correlación propagado o generado por el servidor.
+      schema: { type: string, format: uuid }
+    DataAsOf:
+      description: Instante del último evento incorporado correctamente a la proyección.
+      schema: { type: string, format: date-time }
+  responses:
+    BadRequest:
+      description: Parámetros ausentes, mal formados o zona horaria inválida
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblem' }
+    Unauthorized:
+      description: Token ausente, inválido o expirado
+      headers:
+        WWW-Authenticate:
+          schema: { type: string }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: El usuario autenticado no tiene un rol autorizado
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InvalidDateRange:
+      description: El rango es inconsistente o supera 366 días
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblem' }
+    InternalError:
+      description: Error interno sin exposición de detalles sensibles
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    EstadoSolicitud:
+      type: string
+      enum: [REGISTRADA, EN_ATENCION, RESUELTA, CERRADA]
+    Periodo:
+      type: object
+      additionalProperties: false
+      required: [desde, hasta, zonaHoraria]
+      properties:
+        desde: { type: string, format: date }
+        hasta: { type: string, format: date }
+        zonaHoraria: { type: string, examples: [UTC] }
+    ConteoPorEstado:
+      type: object
+      additionalProperties: false
+      required: [estado, cantidad]
+      properties:
+        estado: { $ref: '#/components/schemas/EstadoSolicitud' }
+        cantidad: { type: integer, format: int64, minimum: 0 }
+    ConteoPorCategoria:
+      type: object
+      additionalProperties: false
+      required: [categoriaId, codigo, nombre, cantidad]
+      properties:
+        categoriaId: { type: string, format: uuid }
+        codigo: { type: string, maxLength: 30, examples: [COORDINACION] }
+        nombre: { type: string, maxLength: 100, examples: [Coordinación interna] }
+        cantidad: { type: integer, format: int64, minimum: 0 }
+    ResumenIndicadoresResponse:
+      type: object
+      additionalProperties: false
+      required: [periodo, total, porEstado, porCategoria, actualizadoHasta]
+      properties:
+        periodo: { $ref: '#/components/schemas/Periodo' }
+        total: { type: integer, format: int64, minimum: 0 }
+        porEstado:
+          type: array
+          items: { $ref: '#/components/schemas/ConteoPorEstado' }
+        porCategoria:
+          type: array
+          items: { $ref: '#/components/schemas/ConteoPorCategoria' }
+        actualizadoHasta:
+          type: string
+          format: date-time
+          description: Instante del último evento aplicado a la proyección.
+    PuntoTendencia:
+      type: object
+      additionalProperties: false
+      required: [fecha, registradas, resueltas, cerradas]
+      properties:
+        fecha: { type: string, format: date }
+        registradas: { type: integer, format: int64, minimum: 0 }
+        resueltas: { type: integer, format: int64, minimum: 0 }
+        cerradas: { type: integer, format: int64, minimum: 0 }
+    TendenciaDiariaResponse:
+      type: object
+      additionalProperties: false
+      required: [periodo, puntos, actualizadoHasta]
+      properties:
+        periodo: { $ref: '#/components/schemas/Periodo' }
+        categoriaId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+        puntos:
+          type: array
+          items: { $ref: '#/components/schemas/PuntoTendencia' }
+        actualizadoHasta: { type: string, format: date-time }
+    Problem:
+      type: object
+      additionalProperties: true
+      required: [type, title, status, detail, instance, correlationId, code]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string, format: uri-reference }
+        correlationId: { type: string, format: uuid }
+        code: { type: string, examples: [RANGO_FECHAS_INVALIDO] }
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                required: [field, message]
+                properties:
+                  field: { type: string }
+                  message: { type: string }

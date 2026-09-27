@@ -1,0 +1,115 @@
+@solicitudesUrl = http://localhost:8081
+@indicadoresUrl = http://localhost:8082
+@categoriaId = 10000000-0000-0000-0000-000000000001
+@solicitanteId = solicitante-prueba-001
+@analistaId = analista-prueba-001
+@supervisorId = supervisor-prueba-001
+
+### 1. Listar categorías activas
+GET {{solicitudesUrl}}/api/v1/categorias
+Accept: application/json
+X-Local-User-Id: {{solicitanteId}}
+X-Local-User-Role: SOLICITANTE
+
+### 2. Registrar solicitud con datos sintéticos (seed 42)
+# @name registrarSolicitud
+POST {{solicitudesUrl}}/api/v1/solicitudes
+Content-Type: application/json
+Accept: application/json
+Idempotency-Key: {{$guid}}
+X-Correlation-ID: {{$guid}}
+X-Local-User-Id: {{solicitanteId}}
+X-Local-User-Role: SOLICITANTE
+
+{
+  "asunto": "Solicitud prueba 9564",
+  "descripcion": "Descripcion sintetica para solicitud 7127",
+  "categoriaId": "{{categoriaId}}",
+  "prioridad": "ALTA"
+}
+
+### 3. Listar solicitudes con filtros y paginación
+GET {{solicitudesUrl}}/api/v1/solicitudes?estado=REGISTRADA&categoriaId={{categoriaId}}&prioridad=ALTA&page=0&size=20&sort=creadaEn,desc
+Accept: application/json
+X-Correlation-ID: {{$guid}}
+X-Local-User-Id: {{solicitanteId}}
+X-Local-User-Role: SOLICITANTE
+
+### 4. Consultar detalle
+GET {{solicitudesUrl}}/api/v1/solicitudes/{{registrarSolicitud.response.body.$.id}}
+Accept: application/json
+X-Correlation-ID: {{$guid}}
+X-Local-User-Id: {{solicitanteId}}
+X-Local-User-Role: SOLICITANTE
+
+### 5. Tomar solicitud como analista
+# @name tomarSolicitud
+POST {{solicitudesUrl}}/api/v1/solicitudes/{{registrarSolicitud.response.body.$.id}}/asignaciones
+Content-Type: application/json
+Accept: application/json
+Idempotency-Key: {{$guid}}
+If-Match: {{registrarSolicitud.response.headers.ETag}}
+X-Correlation-ID: {{$guid}}
+X-Local-User-Id: {{analistaId}}
+X-Local-User-Role: ANALISTA
+
+{
+  "motivo": "Inicio atencion 5358"
+}
+
+### 6. Agregar observación como analista asignado
+# @name agregarObservacion
+POST {{solicitudesUrl}}/api/v1/solicitudes/{{registrarSolicitud.response.body.$.id}}/observaciones
+Content-Type: application/json
+Accept: application/json
+Idempotency-Key: {{$guid}}
+If-Match: {{tomarSolicitud.response.headers.ETag}}
+X-Correlation-ID: {{$guid}}
+X-Local-User-Id: {{analistaId}}
+X-Local-User-Role: ANALISTA
+
+{
+  "contenido": "Observacion sintetica 3871"
+}
+
+### 7. Resolver solicitud como analista
+# @name resolverSolicitud
+POST {{solicitudesUrl}}/api/v1/solicitudes/{{registrarSolicitud.response.body.$.id}}/transiciones
+Content-Type: application/json
+Accept: application/json
+Idempotency-Key: {{$guid}}
+If-Match: {{agregarObservacion.response.headers.ETag}}
+X-Correlation-ID: {{$guid}}
+X-Local-User-Id: {{analistaId}}
+X-Local-User-Role: ANALISTA
+
+{
+  "estadoDestino": "RESUELTA",
+  "motivo": "Resolucion satisfactoria 7543"
+}
+
+### 8. Cerrar solicitud como supervisor
+# @name cerrarSolicitud
+POST {{solicitudesUrl}}/api/v1/solicitudes/{{registrarSolicitud.response.body.$.id}}/transiciones
+Content-Type: application/json
+Accept: application/json
+Idempotency-Key: {{$guid}}
+If-Match: {{resolverSolicitud.response.headers.ETag}}
+X-Correlation-ID: {{$guid}}
+X-Local-User-Id: {{supervisorId}}
+X-Local-User-Role: SUPERVISOR
+
+{
+  "estadoDestino": "CERRADA",
+  "motivo": "Cierre supervisor 1007"
+}
+
+### 9. Consultar resumen de indicadores sembrados
+GET {{indicadoresUrl}}/api/v1/indicadores/resumen
+Accept: application/json
+X-Correlation-ID: {{$guid}}
+
+### 10. Consultar tendencia de los últimos 30 días
+GET {{indicadoresUrl}}/api/v1/indicadores/tendencia?desde={{$datetime "yyyy-MM-dd" -30 d}}&hasta={{$datetime "yyyy-MM-dd"}}&zonaHoraria=America/Santiago
+Accept: application/json
+X-Correlation-ID: {{$guid}}

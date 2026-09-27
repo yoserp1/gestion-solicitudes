@@ -1,0 +1,13 @@
+{
+  "eventId": "20000000-0000-0000-0000-000000000002",
+  "occurredAt": "2026-09-27T12:05:00Z",
+  "aggregateId": "30000000-0000-0000-0000-000000000001",
+  "type": "SolicitudTomada",
+  "version": 1,
+  "correlationId": "40000000-0000-0000-0000-000000000002",
+  "estado": "EN_ATENCION",
+  "categoriaId": "10000000-0000-0000-0000-000000000002",
+  "categoriaCodigo": "SOPORTE",
+  "categoriaNombre": "Soporte operativo",
+  "actorId": "analista-demo"
+}

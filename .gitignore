@@ -1,0 +1,8 @@
+.env
+**/target/
+.idea/
+*.iml
+.vscode
+.venv
+**/node_modules/
+frontend/dist/
