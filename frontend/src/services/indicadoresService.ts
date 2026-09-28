@@ -8,7 +8,7 @@ export const indicadoresService = {
 
   getTrend: (session: Session, filters: IndicatorFilters, signal?: AbortSignal) => {
     const params = indicatorParams(filters)
-    params.set('zonaHoraria', 'America/Santiago')
+    params.set('zonaHoraria', 'America/Bogota')
     return requestJson<TrendIndicators>(`/api/v1/indicadores/tendencia?${params}`, { session, signal }, trendIndicatorsSchema)
   },
 }
