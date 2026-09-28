@@ -12,10 +12,12 @@ proyección CQRS idempotente.
 - [Servicios y puertos](#servicios-y-puertos)
 - [Usuarios y roles de prueba](#usuarios-y-roles-de-prueba)
 - [Demostración](#demostración)
+- [Evidencia visual](#evidencia-visual)
 - [Pruebas](#pruebas)
 - [Contratos](#contratos)
 - [Configuración](#configuración)
 - [Decisiones](#decisiones)
+- [Desarrollador](#desarrollador)
 - [Limitaciones](#limitaciones)
 
 ## Arquitectura
@@ -26,7 +28,7 @@ La solución contiene un frontend React y dos microservicios Java 21/Spring Boot
 - `ms-solicitudes`: API operacional, reglas de negocio, historial, idempotencia y Outbox.
 - `ms-indicadores`: consumidor idempotente y API de consulta sobre una proyección analítica.
 - SQL Server: bases independientes `solicitudes_db` e `indicadores_db`.
-- Apache Kafka: tópico `solicitudes.v1`, con `solicitudId` como clave de partición.
+- Apache Kafka: tópico `solicitudes.v1`, con `aggregateId` como clave de partición.
 
 Documentación:
 
@@ -54,22 +56,28 @@ los servicios directamente desde el código fuente.
 Copy-Item .env.example .env
 ```
 
-2. Cambie `MSSQL_SA_PASSWORD` y `DB_PASSWORD` en `.env`, manteniendo el mismo valor en ambas variables.
-La contraseña debe cumplir la política de complejidad de SQL Server.
+2. Cambie `MSSQL_SA_PASSWORD` en `.env`. La contraseña debe cumplir la política de complejidad
+de SQL Server. Compose la propaga a ambos microservicios como `DB_PASSWORD`.
 
 3. Construya y levante toda la solución:
 
 ```powershell
-docker compose up --build
+docker compose up -d --build --wait
 ```
 
-Espere hasta que `frontend`, `ms-solicitudes` y `ms-indicadores` aparezcan como saludables. En otra terminal:
+Compose crea la red y el volumen, espera a SQL Server, ejecuta `sqlserver-init`, aplica las
+migraciones Flyway, inicia Kafka, levanta los microservicios y finalmente el frontend.
+Compruebe el resultado:
 
 ```powershell
-docker compose ps
+docker compose ps -a
+Invoke-RestMethod http://localhost:8080/health
 Invoke-RestMethod http://localhost:8081/actuator/health
 Invoke-RestMethod http://localhost:8082/actuator/health
 ```
+
+`sqlserver-init` debe aparecer como `Exited (0)`: es un inicializador de ejecución única, no un
+servicio permanente. La aplicación queda disponible en `http://localhost:8080/`.
 
 Para detenerla:
 
@@ -81,6 +89,7 @@ Para eliminar también las bases locales y repetir la inicialización desde cero
 
 ```powershell
 docker compose down --volumes
+docker compose up -d --build --wait
 ```
 
 ## Servicios y puertos
@@ -128,6 +137,26 @@ flujo con los distintos roles. También puede ejecutar manualmente
 Después de registrar una solicitud, el publicador Outbox la envía a Kafka y `ms-indicadores`
 actualiza su proyección. La propagación es eventualmente consistente y puede tardar algunos segundos.
 
+## Evidencia visual
+
+### Bandeja de solicitudes
+
+Vista de trabajo para filtrar solicitudes y revisar su estado, prioridad y última actualización.
+
+![Bandeja de trabajo con filtros y listado de solicitudes](docs/img/bandeja.png)
+
+### Registro de solicitud
+
+Formulario disponible para el rol `SOLICITANTE`, con selección de categoría y prioridad.
+
+![Formulario para registrar una nueva solicitud](docs/img/formulario.png)
+
+### Detalle y trazabilidad
+
+Detalle operacional con versión `ETag`, estado vigente, información de atención y línea de tiempo.
+
+![Detalle de una solicitud con acciones y línea de tiempo](docs/img/detalle.png)
+
 ## Pruebas
 
 Para ejecutar las pruebas fuera de Docker, levante al menos SQL Server y use Java 21:
@@ -165,7 +194,7 @@ Cada microservicio aplica sus migraciones Flyway desde `src/main/resources/db/mi
 | `MSSQL_SA_PASSWORD` | Contraseña local de SQL Server. | Debe definirse en `.env`. |
 | `DB_URL` | URL JDBC; Compose define una distinta por servicio. | Definida por Compose. |
 | `DB_USERNAME` | Usuario SQL Server local. | `sa` |
-| `DB_PASSWORD` | Contraseña JDBC local. | Debe coincidir con `MSSQL_SA_PASSWORD`. |
+| `DB_PASSWORD` | Contraseña JDBC para ejecución directa; Compose usa `MSSQL_SA_PASSWORD`. | Debe coincidir con `MSSQL_SA_PASSWORD`. |
 | `KAFKA_BOOTSTRAP_SERVERS` | Brokers Kafka. | `kafka:9092` en Compose. |
 | `SOLICITUDES_TOPIC` | Tópico de eventos. | `solicitudes.v1` |
 | `KAFKA_CONSUMER_GROUP` | Grupo del proyector analítico. | `indicadores-v1` |
@@ -185,6 +214,12 @@ El archivo `.env` está excluido de Git. No use credenciales productivas en esta
 - Modelo CQRS de lectura especializado para resumen y tendencia.
 - Autenticación simplificada por cabeceras exclusivamente en el perfil local.
 
+## Desarrollador
+
+- **Nombre:** Yoser Perez
+- **Correo:** [yoserp1@gmail.com](mailto:yoserp1@gmail.com)
+- **Web:** [yoserp1.cloud](https://yoserp1.cloud/)
+
 ## Limitaciones
 
 - El entorno local usa un único broker Kafka y una única instancia SQL Server; no representa alta disponibilidad.
@@ -193,114 +228,4 @@ El archivo `.env` está excluido de Git. No use credenciales productivas en esta
 - No se incluye despliegue público ni proveedor de identidad local.
 - La suite actual no publica un porcentaje de cobertura; los reportes disponibles son JUnit/Surefire.
 
-Consulte [USO_DE_IA.md](USO_DE_IA.md) para la declaración de asistencia utilizada en la solución.# Gestión de solicitudes e indicadores
-
-## Requisitos
-
-- Java 21
-- Docker Desktop con contenedores Linux
-- PowerShell 7 o Windows PowerShell
-
-## SQL Server local
-
-1. Cree el archivo local de variables a partir de `.env.example` y reemplace la contraseña de ejemplo:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-2. Inicie SQL Server y el inicializador:
-
-```powershell
-docker compose up -d sqlserver sqlserver-init
-docker compose ps -a
-```
-
-El contenedor expone SQL Server en `localhost:1433` y conserva los datos en el volumen
-`sqlserver-data`. El inicializador crea dos bases independientes:
-
-- `solicitudes_db`: escritura operacional, historial, idempotencia y Outbox.
-- `indicadores_db`: proyección analítica y deduplicación de eventos.
-
-Cada microservicio aplica su propio esquema con Flyway al arrancar en perfil `local`.
-
-## Ejecutar los servicios
-
-```powershell
-Set-Location backend/ms-solicitudes
-.\mvnw.cmd spring-boot:run
-```
-
-En otra terminal:
-
-```powershell
-Set-Location backend/ms-indicadores
-.\mvnw.cmd spring-boot:run
-```
-
-Ambos servicios importan automáticamente el `.env` ubicado en la raíz. Para usar otra ubicación,
-defina `ENV_FILE` con una ruta absoluta o relativa antes de iniciar el servicio. Las variables de
-entorno del proceso tienen prioridad sobre los valores del archivo.
-
-Swagger queda disponible en:
-
-- Solicitudes: `http://localhost:8081/swagger-ui.html`
-- Indicadores: `http://localhost:8082/swagger-ui.html`
-
-Sin indicar un perfil se usa `docs`, que permite consultar Swagger sin requerir base de datos.
-Este perfil sólo expone el contrato y sus operaciones responden `501 Not Implemented`. Para ejecutar
-la implementación y acceder a los datos de prueba se debe iniciar cada servicio con el perfil `local`.
-
-## Datos de prueba
-
-Flyway carga automáticamente al iniciar con `local`:
-
-- Tres categorías operacionales en `solicitudes_db`.
-- Cuatro solicitudes analíticas, una por cada estado, y sus transiciones en `indicadores_db`.
-
-La colección [test-data/todos-los-endpoints.http](test-data/todos-los-endpoints.http) recorre todos los
-endpoints y encadena dinámicamente el identificador y el `ETag` de la solicitud creada. Ejecute las
-peticiones en orden desde VS Code después de levantar ambos servicios con `local`.
-
-También puede validar el flujo completo y sus resultados desde PowerShell:
-
-```powershell
-.\test-data\validar-endpoints.ps1
-```
-
-Las cabeceras `X-Local-User-Id` y `X-Local-User-Role` permiten probar los roles `SOLICITANTE`,
-`ANALISTA` y `SUPERVISOR`; sólo son interpretadas por la configuración del perfil `local`.
-El dataset fuente se generó de forma determinista con semilla `42` y está disponible en
-[test-data/solicitudes-synthetic.json](test-data/solicitudes-synthetic.json). Para regenerarlo:
-
-```powershell
-python "$HOME\.copilot\skills\synthetic-data-generator\scripts\generate_data.py" `
-	--schema test-data/solicitudes-schema.json `
-	--formato json `
-	--output test-data/solicitudes-synthetic.json
-```
-
-## Configuración
-
-| Variable | Descripción |
-|---|---|
-| `SPRING_PROFILES_ACTIVE` | Perfil de ambos servicios; use `local` para ejecutar la implementación. |
-| `MSSQL_SA_PASSWORD` | Contraseña del contenedor SQL Server; requerida por Compose. |
-| `DB_URL` | JDBC URL opcional; cada servicio tiene su base local predeterminada. |
-| `DB_USERNAME` | Usuario SQL Server, `sa` sólo para desarrollo local. |
-| `DB_PASSWORD` | Contraseña SQL Server; no debe versionarse. |
-| `KAFKA_BOOTSTRAP_SERVERS` | Dirección del broker Kafka; por defecto `localhost:9092`. |
-| `SWAGGER_ENABLED` | Habilita Swagger y OpenAPI. |
-| `ENV_FILE` | Ruta alternativa al archivo `.env`. |
-| `LOCAL_USER_ID` | Identidad técnica utilizada únicamente en perfil `local`. |
-| `LOCAL_USER_ROLE` | Rol local: `SOLICITANTE`, `ANALISTA` o `SUPERVISOR`. |
-
-## Validación
-
-```powershell
-Set-Location backend/ms-solicitudes
-.\mvnw.cmd test
-
-Set-Location ../ms-indicadores
-.\mvnw.cmd test
-```
+Consulte [USO_DE_IA.md](USO_DE_IA.md) para la declaración de asistencia utilizada en la solución.

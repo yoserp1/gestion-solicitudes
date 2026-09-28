@@ -2,7 +2,7 @@
 
 ## Herramienta utilizada
 
-- GitHub Copilot en Visual Studio Code.
+- GitHub CopilotCLI.
 
 ## Actividades apoyadas
 
