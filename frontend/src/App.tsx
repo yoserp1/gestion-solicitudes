@@ -1,6 +1,7 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { Alert, Box, CircularProgress, Container } from '@mui/material'
+import { lazy, Suspense, type FormEvent, useEffect, useState } from 'react'
+import { LoginView } from './components/auth/LoginView'
 import { RequestState } from './components/common/RequestState'
-import { IndicatorsView } from './components/indicators/IndicatorsView'
 import { AppHeader } from './components/layout/AppHeader'
 import { WorkspaceHeading } from './components/layout/WorkspaceHeading'
 import { CreateRequestForm } from './components/requests/CreateRequestForm'
@@ -10,9 +11,9 @@ import { INITIAL_INDICATOR_FILTERS, INITIAL_REQUEST_FILTERS } from './config/def
 import { useSession } from './hooks/useSession'
 import { useWorkspaceData } from './hooks/useWorkspaceData'
 import { solicitudesService } from './services/solicitudesService'
-import type { CreateRequestInput, IndicatorFilters, RequestDetail, RequestFilters, Status } from './interfaces'
+import type { CreateRequestInput, IndicatorFilters, RequestDetail, RequestFilters, Session, Status } from './interfaces'
 import { pathFromView, type View, viewFromPath } from './utils/routing'
-import './App.css'
+const IndicatorsApp = lazy(() => import('analytics/IndicatorsApp'))
 
 const EMPTY_DRAFT: CreateRequestInput = {
   asunto: '',
@@ -22,7 +23,19 @@ const EMPTY_DRAFT: CreateRequestInput = {
 }
 
 function App() {
-  const { session, setSession } = useSession()
+  const { session, setSession, clearSession } = useSession()
+  if (!session) return <LoginView onLogin={setSession} />
+
+  return <AuthenticatedApp session={session} setSession={setSession} clearSession={clearSession} />
+}
+
+interface AuthenticatedAppProps {
+  session: Session
+  setSession: (session: Session) => void
+  clearSession: () => void
+}
+
+function AuthenticatedApp({ session, setSession, clearSession }: AuthenticatedAppProps) {
   const [view, setView] = useState<View>(viewFromPath)
   const [requestFilters, setRequestFilters] = useState<RequestFilters>(INITIAL_REQUEST_FILTERS)
   const [indicatorFilters, setIndicatorFilters] = useState<IndicatorFilters>(INITIAL_INDICATOR_FILTERS)
@@ -150,9 +163,10 @@ function App() {
           clearFeedback()
           setSession(nextSession)
         }}
+        onLogout={clearSession}
       />
 
-      <main>
+      <Container component="main" maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <WorkspaceHeading
           view={view}
           role={session.role}
@@ -202,15 +216,18 @@ function App() {
         )}
 
         {!hasBlockingState && view.kind === 'indicators' && data.summary && data.trend && (
-          <IndicatorsView
-            categories={data.categories}
-            filters={indicatorFilters}
-            summary={data.summary}
-            trend={data.trend}
-            onFiltersChange={updateIndicatorFilters}
-          />
+          <Suspense fallback={<Box sx={{ display: 'grid', placeItems: 'center', minHeight: 280 }}><CircularProgress aria-label="Cargando módulo analítico" /></Box>}>
+            <IndicatorsApp
+              categories={data.categories}
+              filters={indicatorFilters}
+              summary={data.summary}
+              trend={data.trend}
+              onFiltersChange={updateIndicatorFilters}
+            />
+          </Suspense>
         )}
-      </main>
+        {!hasBlockingState && view.kind === 'detail' && !data.detail && <Alert severity="warning">No tienes autorización o la solicitud no está disponible.</Alert>}
+      </Container>
     </div>
   )
 }

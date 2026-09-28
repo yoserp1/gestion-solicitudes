@@ -22,9 +22,10 @@ proyección CQRS idempotente.
 
 ## Arquitectura
 
-La solución contiene un frontend React y dos microservicios Java 21/Spring Boot 4.1.1:
+La solución contiene un frontend federado React y dos microservicios Java 21/Spring Boot 4.1.1:
 
-- `frontend`: bandeja y detalle de solicitudes con identidad local persistente, navegación restaurable y ETag.
+- `frontend`: shell React 19/TypeScript sobre Rspack, MUI 7 + Emotion, Redux Toolkit y validación Zod.
+- `analytics-remote`: microfrontend de indicadores integrado con Module Federation y ejecutable standalone.
 - `ms-solicitudes`: API operacional, reglas de negocio, historial, idempotencia y Outbox.
 - `ms-indicadores`: consumidor idempotente y API de consulta sobre una proyección analítica.
 - SQL Server: bases independientes `solicitudes_db` e `indicadores_db`.
@@ -77,7 +78,8 @@ Invoke-RestMethod http://localhost:8082/actuator/health
 ```
 
 `sqlserver-init` debe aparecer como `Exited (0)`: es un inicializador de ejecución única, no un
-servicio permanente. La aplicación queda disponible en `http://localhost:8080/`.
+servicio permanente. La aplicación queda disponible en `http://localhost:8080/` y el remoto puede
+demostrarse standalone en `http://localhost:8080/analytics-remote/`.
 
 Para detenerla:
 
@@ -96,7 +98,8 @@ docker compose up -d --build --wait
 
 | Componente | Puerto | Acceso |
 |---|---:|---|
-| Frontend | `8080` | `http://localhost:8080` |
+| Shell frontend | `8080` | `http://localhost:8080` |
+| Microfrontend analítico standalone | `8080` | `http://localhost:8080/analytics-remote/` |
 | API de solicitudes | `8081` | `http://localhost:8081` |
 | Swagger solicitudes | `8081` | `http://localhost:8081/swagger-ui.html` |
 | API de indicadores | `8082` | `http://localhost:8082` |
@@ -114,6 +117,11 @@ otros perfiles.
 | `SOLICITANTE` | `solicitante-demo` | Registrar y consultar sus solicitudes. |
 | `ANALISTA` | `analista-demo` | Tomar solicitudes, observarlas, resolverlas y consultar indicadores. |
 | `SUPERVISOR` | `supervisor-demo` | Reabrir/cerrar solicitudes y consultar indicadores. |
+
+Flyway carga cuatro solicitudes operacionales de demostración, una por cada estado. Todas pertenecen
+a `solicitante-demo`; por eso ese identificador debe usarse para verlas con rol `SOLICITANTE`.
+Los roles `ANALISTA` y `SUPERVISOR` pueden consultar las cuatro. Las solicitudes asignadas usan
+`analista-demo`, lo que permite probar observaciones y resolución con esa identidad.
 
 Cabeceras:
 
@@ -158,6 +166,20 @@ Detalle operacional con versión `ETag`, estado vigente, información de atenci�
 ![Detalle de una solicitud con acciones y línea de tiempo](docs/img/detalle.png)
 
 ## Pruebas
+
+Para validar el frontend:
+
+```powershell
+Set-Location frontend
+npm install
+npm test
+npm run lint
+npm run build
+npm run build-storybook
+```
+
+Storybook documenta `RequestState` y `RequestTable` con estados de carga, éxito, error,
+autorización insuficiente y datos representativos. Para abrirlo localmente use `npm run storybook`.
 
 Para ejecutar las pruebas fuera de Docker, levante al menos SQL Server y use Java 21:
 

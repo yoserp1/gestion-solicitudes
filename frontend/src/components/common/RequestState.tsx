@@ -1,4 +1,4 @@
-import { CheckCircle2 } from 'lucide-react'
+import { Alert, Box, Button, CircularProgress } from '@mui/material'
 
 interface RequestStateProps {
   loading: boolean
@@ -9,16 +9,14 @@ interface RequestStateProps {
 
 export function RequestState({ loading, error, notice, onRetry }: RequestStateProps) {
   return (
-    <>
-      {notice && <div className="notice" role="status"><CheckCircle2 size={18} /> {notice}</div>}
-      {loading && <div className="state-message" role="status"><span className="loader" /> Consultando información...</div>}
+    <Box sx={{ mb: notice || loading || error ? 3 : 0 }}>
+      {notice && <Alert severity="success" role="status">{notice}</Alert>}
+      {loading && <Box role="status" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, minHeight: 160 }}><CircularProgress size={26} /> Consultando información...</Box>}
       {!loading && error && (
-        <div className="error-state" role="alert">
-          <strong>No fue posible completar la operación</strong>
-          <span>{error}</span>
-          <button type="button" onClick={onRetry}>Reintentar</button>
-        </div>
+        <Alert severity={error.includes('Autorización insuficiente') ? 'warning' : 'error'} role="alert" action={<Button color="inherit" size="small" onClick={onRetry}>Reintentar</Button>}>
+          <strong>{error.includes('Autorización insuficiente') ? 'Autorización insuficiente' : 'No fue posible completar la operación'}</strong><br />{error}
+        </Alert>
       )}
-    </>
+    </Box>
   )
 }

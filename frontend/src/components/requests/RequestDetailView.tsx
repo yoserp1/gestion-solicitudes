@@ -1,12 +1,11 @@
-import {
-  ArrowLeft,
-  CalendarClock,
-  CheckCircle2,
-  MessageSquarePlus,
-  RotateCcw,
-  ShieldCheck,
-  UserPlus,
-} from 'lucide-react'
+import ArrowBack from '@mui/icons-material/ArrowBack'
+import AssignmentInd from '@mui/icons-material/AssignmentInd'
+import CheckCircle from '@mui/icons-material/CheckCircle'
+import History from '@mui/icons-material/History'
+import Message from '@mui/icons-material/Message'
+import Replay from '@mui/icons-material/Replay'
+import VerifiedUser from '@mui/icons-material/VerifiedUser'
+import { Box, Button, Chip, Divider, List, ListItem, ListItemText, Paper, Stack, TextField, Typography } from '@mui/material'
 import type { RequestDetail, Session, Status } from '../../interfaces'
 import { formatDateTime } from '../../utils/dateTime'
 
@@ -33,16 +32,14 @@ export function RequestDetailView(props: RequestDetailViewProps) {
   const canObserve = session.role === 'ANALISTA' && detail.estado === 'EN_ATENCION'
 
   return (
-    <section className="detail-layout">
-      <button className="back-button" type="button" onClick={props.onBack}>
-        <ArrowLeft size={17} /> Volver a la bandeja
-      </button>
-      <div className="detail-header">
-        <div><span className="code">{detail.codigo}</span><h2>{detail.asunto}</h2></div>
-        <span className="version"><ShieldCheck size={17} /> ETag {etag ?? `"${detail.version}"`}</span>
-      </div>
-      <div className="detail-grid">
-        <div className="detail-main">
+    <Box component="section">
+      <Button onClick={props.onBack} startIcon={<ArrowBack />} sx={{ mb: 2 }}>Volver a la bandeja</Button>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={1} sx={{ mb: 3 }}>
+        <Box><Typography variant="overline" color="primary">{detail.codigo}</Typography><Typography variant="h4" component="h2" fontWeight={750}>{detail.asunto}</Typography></Box>
+        <Chip icon={<VerifiedUser />} label={`ETag ${etag ?? `"${detail.version}"`}`} variant="outlined" />
+      </Stack>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 2fr) minmax(280px, 1fr)' }, gap: 3 }}>
+        <Stack spacing={3}>
           <RequestDescription detail={detail} />
           {(canAssign || canResolve || canSupervise) && (
             <RequestActions
@@ -64,28 +61,32 @@ export function RequestDetailView(props: RequestDetailViewProps) {
             onObservationChange={props.onObservationChange}
             onAdd={props.onAddObservation}
           />
-        </div>
+        </Stack>
         <RequestTimeline detail={detail} />
-      </div>
-    </section>
+      </Box>
+    </Box>
   )
 }
 
 function RequestDescription({ detail }: { detail: RequestDetail }) {
   return (
-    <article className="description-panel">
-      <h3>Descripción</h3>
-      <p>{detail.descripcion}</p>
-      <dl className="metadata">
-        <div><dt>Estado</dt><dd>{detail.estado.replace('_', ' ')}</dd></div>
-        <div><dt>Prioridad</dt><dd>{detail.prioridad}</dd></div>
-        <div><dt>Categoría</dt><dd>{detail.categoria.nombre}</dd></div>
-        <div><dt>Solicitante</dt><dd>{detail.solicitante.id}</dd></div>
-        <div><dt>Analista</dt><dd>{detail.analistaAsignado?.id ?? 'Sin asignar'}</dd></div>
-        <div><dt>Actualización</dt><dd>{formatDateTime(detail.actualizadaEn)}</dd></div>
-      </dl>
-    </article>
+    <Paper component="article" variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+      <Typography variant="h6" component="h3" gutterBottom>Descripción</Typography>
+      <Typography sx={{ whiteSpace: 'pre-wrap', mb: 3 }}>{detail.descripcion}</Typography>
+      <Box component="dl" sx={{ m: 0, display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+        <Metadata label="Estado" value={detail.estado.replace('_', ' ')} />
+        <Metadata label="Prioridad" value={detail.prioridad} />
+        <Metadata label="Categoría" value={detail.categoria.nombre} />
+        <Metadata label="Solicitante" value={detail.solicitante.id} />
+        <Metadata label="Analista" value={detail.analistaAsignado?.id ?? 'Sin asignar'} />
+        <Metadata label="Actualización" value={formatDateTime(detail.actualizadaEn)} />
+      </Box>
+    </Paper>
   )
+}
+
+function Metadata({ label, value }: { label: string; value: string }) {
+  return <Box><Typography component="dt" variant="caption" color="text.secondary">{label}</Typography><Typography component="dd" sx={{ m: 0, fontWeight: 600 }}>{value}</Typography></Box>
 }
 
 interface RequestActionsProps {
@@ -101,23 +102,20 @@ interface RequestActionsProps {
 
 function RequestActions(props: RequestActionsProps) {
   return (
-    <section className="action-panel">
-      <h3>Atención</h3>
-      <label>
-        Motivo
-        <input minLength={3} maxLength={500} value={props.reason} onChange={(event) => props.onReasonChange(event.target.value)} placeholder="Motivo de la acción" />
-      </label>
-      <div className="action-buttons">
-        {props.canAssign && <button className="primary-button" disabled={props.busy} type="button" onClick={props.onAssign}><UserPlus size={17} /> Tomar solicitud</button>}
-        {props.canResolve && <button className="primary-button" disabled={props.busy} type="button" onClick={() => props.onTransition('RESUELTA')}><CheckCircle2 size={17} /> Resolver</button>}
+    <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+      <Typography variant="h6" component="h3" gutterBottom>Atención</Typography>
+      <TextField fullWidth label="Motivo de la acción" value={props.reason} onChange={(event) => props.onReasonChange(event.target.value)} inputProps={{ minLength: 3, maxLength: 500 }} sx={{ mb: 2 }} />
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+        {props.canAssign && <Button variant="contained" disabled={props.busy} onClick={props.onAssign} startIcon={<AssignmentInd />}>Tomar solicitud</Button>}
+        {props.canResolve && <Button variant="contained" disabled={props.busy} onClick={() => props.onTransition('RESUELTA')} startIcon={<CheckCircle />}>Resolver</Button>}
         {props.canSupervise && (
           <>
-            <button className="secondary-button" disabled={props.busy} type="button" onClick={() => props.onTransition('EN_ATENCION')}><RotateCcw size={17} /> Devolver</button>
-            <button className="primary-button" disabled={props.busy} type="button" onClick={() => props.onTransition('CERRADA')}><ShieldCheck size={17} /> Cerrar</button>
+            <Button variant="outlined" disabled={props.busy} onClick={() => props.onTransition('EN_ATENCION')} startIcon={<Replay />}>Devolver</Button>
+            <Button variant="contained" disabled={props.busy} onClick={() => props.onTransition('CERRADA')} startIcon={<VerifiedUser />}>Cerrar</Button>
           </>
         )}
-      </div>
-    </section>
+      </Stack>
+    </Paper>
   )
 }
 
@@ -132,33 +130,34 @@ interface RequestObservationsProps {
 
 function RequestObservations(props: RequestObservationsProps) {
   return (
-    <section className="observations">
-      <h3>Observaciones <span>{props.detail.observaciones.length}</span></h3>
+    <Paper component="section" variant="outlined" sx={{ p: { xs: 2, md: 3 } }}>
+      <Typography variant="h6" component="h3" gutterBottom>Observaciones <Chip size="small" label={props.detail.observaciones.length} /></Typography>
       {props.canObserve && (
-        <div className="observation-entry">
-          <textarea rows={3} minLength={3} maxLength={2000} value={props.observation} onChange={(event) => props.onObservationChange(event.target.value)} placeholder="Agregar una observación" />
-          <button className="secondary-button" type="button" disabled={props.busy || props.observation.trim().length < 3} onClick={props.onAdd}><MessageSquarePlus size={17} /> Agregar</button>
-        </div>
+        <Stack alignItems="flex-end" spacing={1} sx={{ mb: 2 }}>
+          <TextField fullWidth multiline minRows={3} label="Agregar una observación" value={props.observation} onChange={(event) => props.onObservationChange(event.target.value)} inputProps={{ minLength: 3, maxLength: 2000 }} />
+          <Button variant="outlined" disabled={props.busy || props.observation.trim().length < 3} onClick={props.onAdd} startIcon={<Message />}>Agregar</Button>
+        </Stack>
       )}
       {props.detail.observaciones.length === 0
-        ? <p className="muted">Sin observaciones.</p>
-        : <ul>{[...props.detail.observaciones].reverse().map((item) => <li key={item.id}><p>{item.contenido}</p><small>{item.actor.id} · {formatDateTime(item.creadaEn)}</small></li>)}</ul>}
-    </section>
+        ? <Typography color="text.secondary">Sin observaciones.</Typography>
+        : <List disablePadding>{[...props.detail.observaciones].reverse().map((item, index) => <Box key={item.id}>{index > 0 && <Divider />}<ListItem disableGutters><ListItemText primary={item.contenido} secondary={`${item.actor.id} · ${formatDateTime(item.creadaEn)}`} /></ListItem></Box>)}</List>}
+    </Paper>
   )
 }
 
 function RequestTimeline({ detail }: { detail: RequestDetail }) {
   return (
-    <aside className="timeline-panel">
-      <h3><CalendarClock size={18} /> Línea de tiempo</h3>
-      <ol className="timeline">
+    <Paper component="aside" variant="outlined" sx={{ p: { xs: 2, md: 3 }, alignSelf: 'start' }}>
+      <Typography variant="h6" component="h3" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}><History /> Línea de tiempo</Typography>
+      <Box component="ol" sx={{ listStyle: 'none', p: 0, m: 0 }}>
         {[...detail.historial].reverse().map((entry) => (
-          <li key={entry.id}>
-            <i className={`status-dot status-${entry.estadoDestino.toLowerCase()}`} />
-            <div><strong>{entry.estadoDestino.replace('_', ' ')}</strong><span>{entry.motivo}</span><small>{entry.actor.id} · {formatDateTime(entry.ocurridoEn)}</small></div>
-          </li>
+          <Box component="li" key={entry.id} sx={{ borderLeft: 2, borderColor: 'primary.light', pl: 2, py: 1.5 }}>
+            <Typography fontWeight={700}>{entry.estadoDestino.replace('_', ' ')}</Typography>
+            <Typography variant="body2">{entry.motivo}</Typography>
+            <Typography variant="caption" color="text.secondary">{entry.actor.id} · {formatDateTime(entry.ocurridoEn)}</Typography>
+          </Box>
         ))}
-      </ol>
-    </aside>
+      </Box>
+    </Paper>
   )
 }

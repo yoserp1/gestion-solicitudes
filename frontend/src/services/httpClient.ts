@@ -1,3 +1,4 @@
+import type { ZodType } from 'zod'
 import type { Session } from '../interfaces'
 
 export interface ApiResult<ResponseBody> {
@@ -12,7 +13,7 @@ interface RequestOptions extends RequestInit {
   etag?: string | null
 }
 
-export async function requestJson<ResponseBody>(path: string, options: RequestOptions): Promise<ApiResult<ResponseBody>> {
+export async function requestJson<ResponseBody>(path: string, options: RequestOptions, schema: ZodType<ResponseBody>): Promise<ApiResult<ResponseBody>> {
   const requestHeaders = new Headers(options.headers)
   requestHeaders.set('Accept', 'application/json')
   requestHeaders.set('X-Local-User-Id', options.session.userId)
@@ -25,11 +26,12 @@ export async function requestJson<ResponseBody>(path: string, options: RequestOp
   const response = await fetch(path, { ...options, headers: requestHeaders })
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as { detail?: string } | null
+    if (response.status === 403) throw new Error('Autorización insuficiente para esta operación.')
     throw new Error(problem?.detail ?? `La API respondió con estado ${response.status}`)
   }
 
   return {
-    data: (await response.json()) as ResponseBody,
+    data: schema.parse(await response.json()),
     etag: response.headers.get('ETag'),
     dataAsOf: response.headers.get('X-Data-As-Of'),
   }

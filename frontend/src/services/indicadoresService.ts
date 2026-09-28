@@ -1,14 +1,15 @@
 import type { IndicatorFilters, Session, SummaryIndicators, TrendIndicators } from '../interfaces'
+import { summaryIndicatorsSchema, trendIndicatorsSchema } from '../schemas'
 import { requestJson } from './httpClient'
 
 export const indicadoresService = {
   getSummary: (session: Session, filters: IndicatorFilters, signal?: AbortSignal) =>
-    requestJson<SummaryIndicators>(`/api/v1/indicadores/resumen?${indicatorParams(filters)}`, { session, signal }),
+    requestJson<SummaryIndicators>(`/api/v1/indicadores/resumen?${indicatorParams(filters)}`, { session, signal }, summaryIndicatorsSchema),
 
   getTrend: (session: Session, filters: IndicatorFilters, signal?: AbortSignal) => {
     const params = indicatorParams(filters)
     params.set('zonaHoraria', 'America/Santiago')
-    return requestJson<TrendIndicators>(`/api/v1/indicadores/tendencia?${params}`, { session, signal })
+    return requestJson<TrendIndicators>(`/api/v1/indicadores/tendencia?${params}`, { session, signal }, trendIndicatorsSchema)
   },
 }
 

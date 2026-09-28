@@ -1,4 +1,6 @@
-import { FilePlus2, RefreshCw } from 'lucide-react'
+import Add from '@mui/icons-material/Add'
+import Refresh from '@mui/icons-material/Refresh'
+import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@mui/material'
 import type { Role } from '../../interfaces'
 import type { View } from '../../utils/routing'
 
@@ -31,23 +33,18 @@ export function WorkspaceHeading({ view, role, onCreate, onReload }: WorkspaceHe
   const copy = COPY[view.kind]
 
   return (
-    <section className="workspace-heading">
-      <div>
-        <p className="eyebrow">OPERACIÓN / {copy.eyebrow}</p>
-        <h1>{copy.title}</h1>
-        <p className="subtitle">{copy.subtitle}</p>
-      </div>
-      <div className="heading-actions">
+    <Stack component="section" direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
+      <Box>
+        <Typography variant="overline" color="primary">OPERACIÓN / {copy.eyebrow}</Typography>
+        <Typography component="h1" variant="h1">{copy.title}</Typography>
+        <Typography color="text.secondary">{copy.subtitle}</Typography>
+      </Box>
+      <Stack direction="row" spacing={1}>
         {view.kind === 'inbox' && role === 'SOLICITANTE' && (
-          <button className="primary-button" type="button" onClick={onCreate}>
-            <FilePlus2 size={18} /> Nueva solicitud
-          </button>
+          <Button variant="contained" startIcon={<Add />} onClick={onCreate}>Nueva solicitud</Button>
         )}
-        <button className="icon-button" type="button" onClick={onReload} title="Actualizar">
-          <RefreshCw size={19} aria-hidden="true" />
-          <span className="sr-only">Actualizar</span>
-        </button>
-      </div>
-    </section>
+        <Tooltip title="Actualizar información"><IconButton onClick={onReload} aria-label="Actualizar información"><Refresh /></IconButton></Tooltip>
+      </Stack>
+    </Stack>
   )
 }
